@@ -20,34 +20,22 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            JetpackComposeTheme {
-                // A surface container using the 'background' color from the theme
-                Surface(color = MaterialTheme.colors.background) {
-                   Greeting("Android")
+            Box(
+                modifier = Modifier
+                    .background(color = Color.Green)
+                    .fillMaxWidth()
+                    .height(200.dp)
+            ) { // Box 안에 있는 것들은 모두 겹침
+                Text(text = "Hello")
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.BottomEnd
+                ) {
+                    Text(text = "555555555555")
                 }
             }
         }
     }
 }
-
-@Composable // 선언형 프로그래밍 방식, 직관적인 코드로 UI 제작 가능
-fun Greeting(name: String) {
-    Text(text = "Hello $name!")
-}
-
-@Preview(showBackground = true) // 미리보기
-@Composable
-fun DefaultPreview() {
-    JetpackComposeTheme {
-        Greeting("ㄱㅇㄱ")
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DefaultPreview2() {
-    JetpackComposeTheme {
-        Greeting("2222")
-    }
-}
-
