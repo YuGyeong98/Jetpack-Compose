@@ -5,6 +5,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
@@ -20,20 +23,34 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            Box(
+//            val scrollState = rememberScrollState() // 스크롤 정보 기억
+
+//            Column(
+//                modifier = Modifier
+//                    .background(color = Color.Green)
+//                    .fillMaxWidth()
+//                    .verticalScroll(scrollState)
+//            ) {
+//                for (i in 1..50) {
+//                    Text("글씨 $i")
+//                }
+//            }
+
+            LazyColumn(
                 modifier = Modifier
                     .background(color = Color.Green)
-                    .fillMaxWidth()
-                    .height(200.dp)
-            ) { // Box 안에 있는 것들은 모두 겹침
-                Text(text = "Hello")
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.BottomEnd
-                ) {
-                    Text(text = "555555555555")
+                    .fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp) // 아이템 간 간격 조절
+            ) { // 스크롤이 자동으로 설정됨
+                item {
+                    Text(text = "Header")
+                }
+                items(50) { index ->
+                    Text(text = "글씨 $index")
+                }
+                item {
+                    Text(text = "Footer")
                 }
             }
         }
