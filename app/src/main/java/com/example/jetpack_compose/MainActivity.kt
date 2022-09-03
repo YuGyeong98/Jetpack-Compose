@@ -23,24 +23,31 @@ class MainActivity : ComponentActivity() {
             JetpackComposeTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(color = MaterialTheme.colors.background) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(color = Color.Green)
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) { // 수직 배치
-                        Text("Hello")
-                        Text("World")
-                    }
-//                    Row() { // 수평 배치
-//                        Text("Hello")
-//                        Spacer(Modifier.width(16.dp))
-//                        Text("World")
-//                    }
+                   Greeting("Android")
                 }
             }
         }
     }
 }
+
+@Composable // 선언형 프로그래밍 방식, 직관적인 코드로 UI 제작 가능
+fun Greeting(name: String) {
+    Text(text = "Hello $name!")
+}
+
+@Preview(showBackground = true) // 미리보기
+@Composable
+fun DefaultPreview() {
+    JetpackComposeTheme {
+        Greeting("ㄱㅇㄱ")
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun DefaultPreview2() {
+    JetpackComposeTheme {
+        Greeting("2222")
+    }
+}
+
