@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -27,6 +28,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -36,54 +39,59 @@ import androidx.navigation.compose.rememberNavController
 import com.example.jetpack_compose.ui.theme.JetpackComposeTheme
 import kotlinx.coroutines.launch
 
-//class MainActivity : ComponentActivity() {
-//    private val viewModel by viewModels<MainViewModel>()
-//
-//    override fun onCreate(savedInstanceState: Bundle?) {
-//        super.onCreate(savedInstanceState)
-//        setContent {
-//            Column(
-//                modifier = Modifier.fillMaxSize(),
-//                verticalArrangement = Arrangement.Center,
-//                horizontalAlignment = Alignment.CenterHorizontally
-//            ) {
-//                Text(text = viewModel.data.value, fontSize = 30.sp)
-//                Button(onClick = { viewModel.data.value = "World" }) {
-//                    Text(text = "변경")
-//                }
-//            }
-//        }
-//    }
-//}
-//
-//class MainViewModel : ViewModel() { // Activity와 life cycle을 동일하게 가져가는 특성 -> remember 없어도 데이터 유지
-//    val data = mutableStateOf("Hello")
-//}
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            val viewModel = viewModel<MainViewModel>() // compose 안에서 해결, dependencies에 추가해야 함
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(text = viewModel.data.value, fontSize = 30.sp)
-                Button(onClick = { viewModel.changeValue() }) {
-                    Text(text = "변경")
-                }
-            }
+            HomeScreen()
         }
     }
 }
 
-class MainViewModel : ViewModel() {
-    private val _data = mutableStateOf("Hello")
-    val data: State<String> = _data // 외부에 읽기 전용 state로 제공
+@Composable
+fun HomeScreen(viewModel: MainViewModel = viewModel()) {
+    val text1: MutableState<String> = remember {
+        mutableStateOf("Hello World")
+    }
 
-    fun changeValue() { // 내부에서만 수정 가능하도록
-        _data.value = "World"
+    var text2: String by remember {
+        mutableStateOf("Hello World")
+    }
+
+    val (text, setText) = remember {
+        mutableStateOf("Hello World")
+    }
+
+    val text3: State<String> = viewModel.liveData.observeAsState("Hello World")
+
+    Column() {
+        Text(text = "Hello World")
+        Button(onClick = {
+            text1.value = "변경" // 1. text1
+            print(text1.value)
+            text2 = "변경" // 2. text2
+            print(text2)
+            setText("변경") // 3. (text, setText)
+            viewModel.changeValue("변경") // 4. viewModel
+        }) {
+            Text(text = "클릭")
+        }
+        TextField(
+            value = text,
+            onValueChange = setText
+        ) // recomposition이 일어남(글자 계속 수정하거나 입력하면 다시 화면에 그려짐)
+    }
+}
+
+class MainViewModel : ViewModel() {
+    private val _value: MutableState<String> =
+        mutableStateOf("Hello World") // mutableStateOf - 읽기, 쓰기 가능
+    val value: State<String> = _value // State - 읽기만 가능
+
+    private val _liveData = MutableLiveData<String>()
+    val liveData: LiveData<String> = _liveData
+
+    fun changeValue(value: String) {
+        _value.value = value
     }
 }
