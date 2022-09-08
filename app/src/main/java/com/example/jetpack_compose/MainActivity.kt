@@ -1,30 +1,41 @@
 package com.example.jetpack_compose
 
 import android.os.Bundle
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Space
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import java.util.*
 import kotlin.concurrent.timer
 import kotlin.math.pow
@@ -34,140 +45,107 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             val viewModel = viewModel<MainViewModel>()
-
-            val sec = viewModel.sec.value
-            val milli = viewModel.milli.value
-            val isRunning = viewModel.isRunning.value
-            val lapTimes = viewModel.lapTimes.value
-
-            MainScreen(
-                sec = sec,
-                milli = milli,
-                isRunning = isRunning,
-                lapTimes = lapTimes,
-                onReset = { viewModel.reset() },
-                onToggle = { running ->
-                    if (running) {
-                        viewModel.pause()
-                    } else {
-                        viewModel.start()
-                    }
-                },
-                onLapTime = { viewModel.recordLapTime() })
+            HomeScreen(viewModel = viewModel)
         }
-    }
-}
-
-class MainViewModel : ViewModel() {
-    private var time = 0
-    private var timerTask: Timer? = null
-
-    private val _isRunning = mutableStateOf(false)
-    val isRunning: State<Boolean> = _isRunning
-
-    private val _sec = mutableStateOf(0)
-    val sec: State<Int> = _sec
-
-    private val _milli = mutableStateOf(0)
-    val milli: State<Int> = _milli
-
-    private val _lapTimes = mutableStateOf(mutableListOf<String>())
-    val lapTimes: State<List<String>> = _lapTimes
-
-    private var lap = 1
-
-    fun start() {
-        _isRunning.value = true
-        timerTask = timer(period = 10) {
-            time++ // 0.01초마다 time을 1씩 증가
-            _sec.value = time / 100
-            _milli.value = time % 100
-        }
-    }
-
-    fun pause() {
-        _isRunning.value = false
-        timerTask?.cancel()
-    }
-
-    fun reset() {
-        timerTask?.cancel()
-        time = 0
-        _isRunning.value = false
-        _sec.value = 0
-        _milli.value = 0
-        _lapTimes.value.clear()
-        lap = 1
-    }
-
-    fun recordLapTime() {
-        _lapTimes.value.add(0, "$lap LAP : ${sec.value}.${milli.value}")
-        lap++
     }
 }
 
 @Composable
-fun MainScreen(
-    sec: Int,
-    milli: Int,
-    isRunning: Boolean,
-    lapTimes: List<String>,
-    onReset: () -> Unit,
-    onToggle: (Boolean) -> Unit,
-    onLapTime: () -> Unit
-) {
-    Scaffold(topBar = { TopAppBar(title = { Text(text = "StopWatch") }) }) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(40.dp))
+fun HomeScreen(viewModel: MainViewModel) {
+    val focusManager = LocalFocusManager.current
 
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(text = "$sec", fontSize = 100.sp)
-                Text(text = "$milli")
-            }
+    val (inputUrl, setUrl) = rememberSaveable {
+        mutableStateOf("https://www.google.com")
+    }
+
+    val scaffoldState = rememberScaffoldState() // 스낵바 띄우는 타이밍에 필요
+
+    Scaffold(topBar = {
+        TopAppBar(
+            title = { Text(text = "나만의 웹 브라우저") },
+            actions = {
+                IconButton(onClick = { viewModel.undo() }) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "back",
+                        tint = Color.White
+                    )
+                }
+                IconButton(onClick = { viewModel.redo() }) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = "forward",
+                        tint = Color.White
+                    )
+                }
+            })
+    }, scaffoldState = scaffoldState) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxSize()
+        ) {
+            OutlinedTextField(
+                value = inputUrl,
+                onValueChange = setUrl,
+                label = { Text(text = "https://") }, // 힌트
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = {
+                    viewModel.url.value = inputUrl
+                    focusManager.clearFocus() // 키보드 내려가는 효과
+                })
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-            ) { // weight 1f - 남은 공간 차지
-                lapTimes.forEach { lapTime ->
-                    Text(text = lapTime)
-                }
-            }
+            MyWebView(viewModel = viewModel, scaffoldState = scaffoldState)
+        }
+    }
+}
 
-            Row(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FloatingActionButton(onClick = { onReset() }, backgroundColor = Color.Red) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_baseline_refresh_24),
-                        contentDescription = "reset"
-                    )
-                }
+@Composable
+fun MyWebView(viewModel: MainViewModel, scaffoldState: ScaffoldState) {
+    val webView = rememberWebView()
 
-                FloatingActionButton(
-                    onClick = { onToggle(isRunning) },
-                    backgroundColor = Color.Green
-                ) {
-                    Image(
-                        painter = painterResource(id = if (isRunning) R.drawable.ic_baseline_pause_24 else R.drawable.ic_baseline_play_arrow_24),
-                        contentDescription = "start/pause"
-                    )
-                }
-
-                Button(onClick = { onLapTime() }) {
-                    Text(text = "랩 타임")
-                }
+    LaunchedEffect(Unit) { // rememberCoroutineScope 와 비교, sharedflow와 launchedeffect 같이 사용하면 한번만 수행해야 되는 이벤트성 코드
+        viewModel.undoSharedFlow.collectLatest { // 가장 최근 것만 관찰
+            if (webView.canGoBack()) {
+                webView.goBack()
+            } else {
+                scaffoldState.snackbarHostState.showSnackbar("더 이상 뒤로 갈 수 없음")
             }
         }
     }
+
+    LaunchedEffect(Unit) {
+        viewModel.redoSharedFlow.collectLatest {
+            if (webView.canGoForward()) {
+                webView.goForward()
+            } else {
+                scaffoldState.snackbarHostState.showSnackbar("더 이상 앞으로 갈 수 없음")
+            }
+        }
+    }
+
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = { webView }, // 화면에 표시해야 되는 뷰 객체 인스턴스 지정
+        update = { webView ->
+            webView.loadUrl(viewModel.url.value) // 화면 갱신
+        }) // composition 다시 발생
+}
+
+@Composable
+fun rememberWebView(): WebView {
+    val context = LocalContext.current
+
+    val webView = remember {
+        WebView(context).apply {
+            settings.javaScriptEnabled = true // 웹뷰 설정
+            webViewClient = WebViewClient() // 웹뷰 설정
+            loadUrl("https://google.com")
+        }
+    }
+    return webView
 }
