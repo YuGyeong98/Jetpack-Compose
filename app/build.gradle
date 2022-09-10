@@ -68,4 +68,11 @@ dependencies {
 
     // LiveData
     implementation "androidx.compose.runtime:runtime-livedata:$compose_version"
+
+    // Pager
+    implementation "com.google.accompanist:accompanist-pager:0.19.0"
+    implementation "com.google.accompanist:accompanist-pager-indicators:0.19.0"
+
+    // Coil - 로컬이나 네트워크 이미지를 표시할 때
+    implementation "io.coil-kt:coil-compose:1.4.0"
 }

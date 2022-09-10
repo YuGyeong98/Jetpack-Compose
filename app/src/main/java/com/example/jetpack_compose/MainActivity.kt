@@ -1,151 +1,159 @@
 package com.example.jetpack_compose
 
+import android.Manifest
+import android.app.Application
+import android.content.ContentUris
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.widget.Space
+import android.provider.MediaStore
+import android.webkit.PermissionRequest
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.Button
+import androidx.compose.material.Card
+import androidx.compose.material.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-import java.util.*
-import kotlin.concurrent.timer
-import kotlin.math.pow
+import coil.compose.rememberImagePainter
+import com.google.accompanist.pager.*
+import kotlin.math.absoluteValue
 
 class MainActivity : ComponentActivity() {
+    @ExperimentalPagerApi
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             val viewModel = viewModel<MainViewModel>()
-            HomeScreen(viewModel = viewModel)
+            var granted by remember { mutableStateOf(false) }
+            val launcher =
+                rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted -> // 권한 요청
+                    granted = isGranted
+                }
+
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                granted = true
+            }
+
+            if (granted) { // 권한 허용 상태
+                viewModel.fetchPhotos()
+                HomeScreen(photoUris = viewModel.photoUris.value)
+            } else {
+                PermissionRequestScreen {
+                    launcher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                }
+            }
         }
     }
 }
 
-@Composable
-fun HomeScreen(viewModel: MainViewModel) {
-    val focusManager = LocalFocusManager.current
+class MainViewModel(application: Application) :
+    AndroidViewModel(application) { // contentprovider 사용을 위해 androidviewmodel 사용
+    private val _photoUris = mutableStateOf(emptyList<Uri>())
+    val photoUris: State<List<Uri>> = _photoUris
 
-    val (inputUrl, setUrl) = rememberSaveable {
-        mutableStateOf("https://www.google.com")
+    fun fetchPhotos() {
+        val uris = mutableListOf<Uri>()
+
+        getApplication<Application>().contentResolver.query( // getApplication()으로 context 얻기 가능
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            null,
+            null,
+            null,
+            "${MediaStore.Images.ImageColumns.DATE_TAKEN} DESC" // 찍은 순서 내림차순
+        )?.use { cursor -> // 자동 close
+            val idIndex =
+                cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID) // ID(데이터베이스에 실제로 저장됨)를 토대로 uri 생성 가능
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idIndex)
+                val contentUri = ContentUris.withAppendedId(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    id
+                )
+                uris.add(contentUri)
+            }
+        }
+        _photoUris.value = uris
     }
+}
 
-    val scaffoldState = rememberScaffoldState() // 스낵바 띄우는 타이밍에 필요
+@Composable
+fun PermissionRequestScreen(onClick: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(text = "권한이 허용되지 않았습니다")
+        Button(onClick = onClick) {
+            Text(text = "권한 요청")
+        }
+    }
+}
 
-    Scaffold(topBar = {
-        TopAppBar(
-            title = { Text(text = "나만의 웹 브라우저") },
-            actions = {
-                IconButton(onClick = { viewModel.undo() }) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "back",
-                        tint = Color.White
-                    )
-                }
-                IconButton(onClick = { viewModel.redo() }) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = "forward",
-                        tint = Color.White
-                    )
-                }
-            })
-    }, scaffoldState = scaffoldState) {
-        Column(
+@ExperimentalPagerApi
+@Composable
+fun HomeScreen(photoUris: List<Uri>) {
+    val pagerState = rememberPagerState()
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        HorizontalPager(
+            state = pagerState,
+            count = photoUris.size,
             modifier = Modifier
+                .weight(1f)
                 .padding(16.dp)
                 .fillMaxSize()
-        ) {
-            OutlinedTextField(
-                value = inputUrl,
-                onValueChange = setUrl,
-                label = { Text(text = "https://") }, // 힌트
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = {
-                    viewModel.url.value = inputUrl
-                    focusManager.clearFocus() // 키보드 내려가는 효과
-                })
-            )
+        ) { pageIndex ->
+            Card(modifier = Modifier.graphicsLayer { // graphiclayer - 화면 애니메이션 효과
+                val pageOffset = calculateCurrentOffsetForPage(pageIndex).absoluteValue
+                lerp( // 사진의 위치에 따른 가로, 세로 크기 계산 공식
+                    start = 0.85f,
+                    stop = 1f,
+                    fraction = 1f - pageOffset.coerceIn(0f, 1f)
+                ).also { scale ->
+                    scaleX = scale
+                    scaleY = scale
+                }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            MyWebView(viewModel = viewModel, scaffoldState = scaffoldState)
-        }
-    }
-}
-
-@Composable
-fun MyWebView(viewModel: MainViewModel, scaffoldState: ScaffoldState) {
-    val webView = rememberWebView()
-
-    LaunchedEffect(Unit) { // rememberCoroutineScope 와 비교, sharedflow와 launchedeffect 같이 사용하면 한번만 수행해야 되는 이벤트성 코드
-        viewModel.undoSharedFlow.collectLatest { // 가장 최근 것만 관찰
-            if (webView.canGoBack()) {
-                webView.goBack()
-            } else {
-                scaffoldState.snackbarHostState.showSnackbar("더 이상 뒤로 갈 수 없음")
+                alpha = lerp(start = 0.5f, stop = 1f, fraction = 1f - pageOffset.coerceIn(0f, 1f))
+            }) {
+                Image(
+                    painter = rememberImagePainter(data = photoUris[pageIndex]),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop // 이미지가 꽉 차도록
+                )
             }
         }
-    }
 
-    LaunchedEffect(Unit) {
-        viewModel.redoSharedFlow.collectLatest {
-            if (webView.canGoForward()) {
-                webView.goForward()
-            } else {
-                scaffoldState.snackbarHostState.showSnackbar("더 이상 앞으로 갈 수 없음")
-            }
-        }
+        HorizontalPagerIndicator(
+            pagerState = pagerState,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(16.dp)
+        )
     }
-
-    AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { webView }, // 화면에 표시해야 되는 뷰 객체 인스턴스 지정
-        update = { webView ->
-            webView.loadUrl(viewModel.url.value) // 화면 갱신
-        }) // composition 다시 발생
 }
 
-@Composable
-fun rememberWebView(): WebView {
-    val context = LocalContext.current
-
-    val webView = remember {
-        WebView(context).apply {
-            settings.javaScriptEnabled = true // 웹뷰 설정
-            webViewClient = WebViewClient() // 웹뷰 설정
-            loadUrl("https://google.com")
-        }
-    }
-    return webView
-}
+private fun lerp(start: Float, stop: Float, fraction: Float): Float =
+    (1 - fraction) * start + fraction * stop
