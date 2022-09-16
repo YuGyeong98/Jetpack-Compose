@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'kotlin-kapt'
 }
 
 android {
@@ -75,4 +76,12 @@ dependencies {
 
     // Coil - 로컬이나 네트워크 이미지를 표시할 때
     implementation "io.coil-kt:coil-compose:1.4.0"
+
+    // Room
+    def room_version = "2.3.0"
+    implementation("androidx.room:room-runtime:$room_version")
+    kapt("androidx.room:room-compiler:$room_version")
+
+    // optional - Kotlin Extensions and Coroutines support for Room
+    implementation("androidx.room:room-ktx:$room_version")
 }
